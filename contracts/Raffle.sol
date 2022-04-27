@@ -8,10 +8,20 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
   VRFCoordinatorV2Interface COORDINATOR;
 
-  address[] public eligibleWallets;
-  mapping (uint => address) public winners;
+  // Keeps track of wallets that have been added the drawing. Once a wallet is selected 
+  // as a winner or runner-up, they are removed from this list in order to
+  // prevent that same wallet from possibly being selected again.
+  address[] public walletsInDrawing;
+
+  // A lookup to check if a wallet is part of the drawing. Unlike walletsInDrawing, once
+  // a wallet to added to this lookup, they will remain in this lookup, winner or not.
+  mapping(address => bool) public isInDrawing;
+
+  // Provide a lookup on the placement of the winner and runner-ups.
+  mapping(uint => address) public winners;
 
   enum RAFFLE_STATE { CLOSED, OPEN, CALCULATING_WINNER }
+  RAFFLE_STATE public raffleState;
 
   uint64 s_subscriptionId;
 
@@ -41,21 +51,25 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
 
   uint256[] public s_randomWords;
   uint256 public s_requestId;
-  address s_owner;
 
   constructor(uint64 subscriptionId) VRFConsumerBaseV2(vrfCoordinator) {
     COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
-    s_owner = msg.sender;
     s_subscriptionId = subscriptionId;
+    raffleState == RAFFLE_STATE.OPEN;
   }
 
-  function addEligibleWallet(address[] memory addresses) external onlyOwner {
+  function addWallets(address[] memory addresses) external onlyOwner {
     for(uint256 i=0;i < addresses.length;i++) {
-      eligibleWallets.push(addresses[i]);
+      // ignore any addresses that are already part of the drawing
+      if(isInDrawing[addresses[i]]) {
+        break;
+      }
+
+      walletsInDrawing.push(addresses[i]);
+      isInDrawing[addresses[i]] = true;
     }
   }
 
-  // Assumes the subscription is funded sufficiently.
   function requestRandomWords() external onlyOwner {
     // Will revert if subscription is not set and funded.
     s_requestId = COORDINATOR.requestRandomWords(
