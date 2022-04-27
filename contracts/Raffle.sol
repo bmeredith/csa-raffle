@@ -90,7 +90,11 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
     raffleState = RAFFLE_STATE.CLOSED;
   }
 
-  function requestRandomWords() external onlyOwner { 
+  function drawWinner() external onlyOwner {
+    requestRandomWords();
+  }
+
+  function requestRandomWords() private { 
     require(raffleState == RAFFLE_STATE.OPEN, "Raffle must be open");
     require(walletsInRaffle.length > 0, "No wallets in raffle");
     uint32 numWords =  1;
