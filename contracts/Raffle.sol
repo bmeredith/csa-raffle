@@ -8,22 +8,29 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
   VRFCoordinatorV2Interface COORDINATOR;
 
-  // Keeps track of wallets that have been added the drawing. Once a wallet is selected 
+  // Keeps track of wallets that have been added the raffle. Once a wallet is selected 
   // as a winner or runner-up, they are removed from this list in order to
   // prevent that same wallet from possibly being selected again.
-  address[] public walletsInDrawing;
+  address[] public walletsInRaffle;
 
-  // A lookup to check if a wallet is part of the drawing. Unlike walletsInDrawing, once
+  // A lookup to provide the requestId that Chainlink VRF provided each time a drawing is done.
+  // (e.g. index of 1 = winner's VRF requestId that used, 2 = first runner-up's VRF requestId, etc.)
+  mapping(uint => uint256) public requestIdPlacement;
+
+  // A lookup to check if a wallet is part of the raffle. Unlike walletsInRaffle, once
   // a wallet to added to this lookup, they will remain in this lookup, winner or not.
-  mapping(address => bool) public isInDrawing;
+  mapping(address => bool) public isInRaffle;
 
   // Provide a lookup on the placement of the winner and runner-ups.
   mapping(uint => address) public winners;
 
-  enum RAFFLE_STATE { CLOSED, OPEN, CALCULATING_WINNER }
+  // Keeps track of how many draws have been done for the raffle.
+  uint256 public numDraws;
+
+  enum RAFFLE_STATE { OPEN, CLOSED, CALCULATING_WINNER }
   RAFFLE_STATE public raffleState;
 
-  uint64 s_subscriptionId;
+  uint64 subscriptionId;
 
   // Rinkeby coordinator. For other networks,
   // see https://docs.chain.link/docs/vrf-contracts/#configurations
@@ -45,46 +52,68 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
   // The default is 3, but you can set this higher.
   uint16 requestConfirmations = 3;
 
-  // retrieve 3 random values in one request.
-  // Cannot exceed VRFCoordinatorV2.MAX_NUM_WORDS.
-  uint32 numWords =  1;
+  event RequestedRandomness(uint256 requestId);
 
-  uint256[] public s_randomWords;
-  uint256 public s_requestId;
-
-  constructor(uint64 subscriptionId) VRFConsumerBaseV2(vrfCoordinator) {
+  constructor(uint64 _subscriptionId) VRFConsumerBaseV2(vrfCoordinator) {
     COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
-    s_subscriptionId = subscriptionId;
-    raffleState == RAFFLE_STATE.OPEN;
+    subscriptionId = _subscriptionId;
   }
 
-  function addWallets(address[] memory addresses) external onlyOwner {
+  function addWalletsToRaffle(address[] memory addresses) external onlyOwner {
+    require(raffleState == RAFFLE_STATE.OPEN, "Raffle must be open");
+    
     for(uint256 i=0;i < addresses.length;i++) {
-      // ignore any addresses that are already part of the drawing
-      if(isInDrawing[addresses[i]]) {
+      // ignore any addresses that are already part of the raffle
+      if(isInRaffle[addresses[i]]) {
         break;
       }
 
-      walletsInDrawing.push(addresses[i]);
-      isInDrawing[addresses[i]] = true;
+      walletsInRaffle.push(addresses[i]);
+      isInRaffle[addresses[i]] = true;
     }
   }
 
-  function requestRandomWords() external onlyOwner {
-    // Will revert if subscription is not set and funded.
-    s_requestId = COORDINATOR.requestRandomWords(
+  // Once raffle is fully finished and a winner has been chosen, close down the raffle permanently. 
+  function closeRaffle() external onlyOwner {
+    require(raffleState == RAFFLE_STATE.OPEN, "Raffle must be open");
+
+    raffleState = RAFFLE_STATE.CLOSED;
+  }
+
+  function requestRandomWords() external onlyOwner { 
+    require(raffleState == RAFFLE_STATE.OPEN, "Raffle must be open");
+    require(walletsInRaffle.length > 0, "No wallets in raffle");
+    uint32 numWords =  1;
+
+    raffleState = RAFFLE_STATE.CALCULATING_WINNER;
+    uint256 requestId = COORDINATOR.requestRandomWords(
       keyHash,
-      s_subscriptionId,
+      subscriptionId,
       requestConfirmations,
       callbackGasLimit,
       numWords
     );
+
+    emit RequestedRandomness(requestId);
   }
   
   function fulfillRandomWords(
-    uint256, /* requestId */
+    uint256 requestId,
     uint256[] memory randomWords
   ) internal override {
-    s_randomWords = randomWords;
+    require(raffleState == RAFFLE_STATE.CALCULATING_WINNER, "Not there yet");
+    numDraws++;
+
+    uint256 indexOfWinner = randomWords[0] % walletsInRaffle.length;
+    requestIdPlacement[numDraws] = requestId;
+    winners[numDraws] = walletsInRaffle[indexOfWinner];
+
+    removeWalletFromRaffle(indexOfWinner);
+    raffleState = RAFFLE_STATE.OPEN;
+  }
+
+  function removeWalletFromRaffle(uint index) private {
+    walletsInRaffle[index] = walletsInRaffle[walletsInRaffle.length - 1];
+    walletsInRaffle.pop();
   }
 }
