@@ -13,9 +13,15 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
   // prevent that same wallet from possibly being selected again.
   address[] public walletsInRaffle;
 
-  // A lookup to provide the requestId that Chainlink VRF provided each time a drawing is done.
+  // A lookup to provide the requestId that Chainlink VRF that was provided each
+  // time a drawing took place.
   // (e.g. index of 1 = winner's VRF requestId that used, 2 = first runner-up's VRF requestId, etc.)
   mapping(uint => uint256) public requestIdPlacement;
+
+  // A lookup to provide the randomly generated number from Chainlink VRF that was provided each
+  // time a drawing took place.
+  // (e.g. index of 1 = winner's VRF random number that generated, 2 = first runner-up's VRF random number, etc.)
+  mapping(uint => uint256) public randomNumberPlacement;
 
   // A lookup to check if a wallet is part of the raffle. Unlike walletsInRaffle, once
   // a wallet to added to this lookup, they will remain in this lookup, winner or not.
@@ -39,7 +45,7 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
   // The gas lane to use, which specifies the maximum gas price to bump to.
   // For a list of available gas lanes on each network,
   // see https://docs.chain.link/docs/vrf-contracts/#configurations
-  bytes32 keyHash = 0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc;
+  bytes32 keyHash;
 
   // Depends on the number of requested values that you want sent to the
   // fulfillRandomWords() function. Storing each word costs about 20,000 gas,
@@ -54,14 +60,19 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
 
   event RequestedRandomness(uint256 requestId);
 
-  constructor(uint64 _subscriptionId) VRFConsumerBaseV2(vrfCoordinator) {
-    COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
+  // see https://docs.chain.link/docs/vrf-contracts/#configurations
+  constructor(
+    uint64 _subscriptionId,
+    bytes32 _keyHash,
+    address _vrfCoordinator) VRFConsumerBaseV2(_vrfCoordinator) {
+    COORDINATOR = VRFCoordinatorV2Interface(_vrfCoordinator);
     subscriptionId = _subscriptionId;
+    keyHash = _keyHash;
   }
 
   function addWalletsToRaffle(address[] memory addresses) external onlyOwner {
     require(raffleState == RAFFLE_STATE.OPEN, "Raffle must be open");
-    
+
     for(uint256 i=0;i < addresses.length;i++) {
       // ignore any addresses that are already part of the raffle
       if(isInRaffle[addresses[i]]) {
@@ -106,6 +117,7 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
 
     uint256 indexOfWinner = randomWords[0] % walletsInRaffle.length;
     requestIdPlacement[numDraws] = requestId;
+    randomNumberPlacement[numDraws] = randomWords[0];
     winners[numDraws] = walletsInRaffle[indexOfWinner];
 
     removeWalletFromRaffle(indexOfWinner);
