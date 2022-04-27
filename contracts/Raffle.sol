@@ -16,18 +16,18 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
   // A lookup to provide the requestId that Chainlink VRF that was provided each
   // time a drawing took place.
   // (e.g. index of 1 = winner's VRF requestId that used, 2 = first runner-up's VRF requestId, etc.)
-  mapping(uint => uint256) public requestIdPlacement;
+  mapping(uint => uint256) public vrfRequestIdPlacement;
 
   // A lookup to provide the randomly generated number from Chainlink VRF that was provided each
   // time a drawing took place.
   // (e.g. index of 1 = winner's VRF random number that generated, 2 = first runner-up's VRF random number, etc.)
-  mapping(uint => uint256) public randomNumberPlacement;
+  mapping(uint => uint256) public vrfRandomNumberPlacement;
 
   // A lookup to check if a wallet is part of the raffle. Unlike walletsInRaffle, once
   // a wallet to added to this lookup, they will remain in this lookup, winner or not.
   mapping(address => bool) public isInRaffle;
 
-  // Provide a lookup on the placement of the winner and runner-ups.
+  // Provides a lookup on the placement of the winner and runner-ups.
   mapping(uint => address) public winners;
 
   // Keeps track of how many draws have been done for the raffle.
@@ -36,20 +36,16 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
   enum RAFFLE_STATE { OPEN, CLOSED, CALCULATING_WINNER }
   RAFFLE_STATE public raffleState;
 
-  uint64 subscriptionId;
+  uint64 vrfSubscriptionId;
 
   // The gas lane to use, which specifies the maximum gas price to bump to.
   // For a list of available gas lanes on each network,
   // see https://docs.chain.link/docs/vrf-contracts/#configurations
-  bytes32 keyHash;
+  bytes32 vrfKeyHash;
 
   // Depends on the number of requested values that you want sent to the
-  // fulfillRandomWords() function. Storing each word costs about 20,000 gas,
-  // so 100,000 is a safe default for this example contract. Test and adjust
-  // this limit based on the network that you select, the size of the request,
-  // and the processing of the callback request in the fulfillRandomWords()
-  // function.
-  uint32 callbackGasLimit = 100000;
+  // fulfillRandomWords() function.
+  uint32 callbackGasLimit = 350000;
 
   // The default is 3, but you can set this higher.
   uint16 requestConfirmations = 3;
@@ -58,12 +54,12 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
 
   // see https://docs.chain.link/docs/vrf-contracts/#configurations
   constructor(
-    uint64 _subscriptionId,
-    bytes32 _keyHash,
+    uint64 _vrfSubscriptionId,
+    bytes32 _vrfKeyHash,
     address _vrfCoordinator) VRFConsumerBaseV2(_vrfCoordinator) {
     COORDINATOR = VRFCoordinatorV2Interface(_vrfCoordinator);
-    subscriptionId = _subscriptionId;
-    keyHash = _keyHash;
+    vrfSubscriptionId = _vrfSubscriptionId;
+    vrfKeyHash = _vrfKeyHash;
   }
 
   function addWalletsToRaffle(address[] memory addresses) external onlyOwner {
@@ -80,6 +76,13 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
     }
   }
 
+  // Return the total number of wallets that were entered into the raffle. 
+  // Note: Since a wallet is removed from walletsInRaffle after winning and a 
+  // drawing only selects 1 wallet, numDraws is used to help determine the correct total number
+  function numWalletsInRaffle() external view returns (uint256) {
+    return walletsInRaffle.length + numDraws;
+  }
+
   // Once raffle is fully finished and a winner has been chosen, close down the raffle permanently. 
   function closeRaffle() external onlyOwner {
     require(raffleState == RAFFLE_STATE.OPEN, "Raffle must be open");
@@ -94,8 +97,8 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
 
     raffleState = RAFFLE_STATE.CALCULATING_WINNER;
     uint256 requestId = COORDINATOR.requestRandomWords(
-      keyHash,
-      subscriptionId,
+      vrfKeyHash,
+      vrfSubscriptionId,
       requestConfirmations,
       callbackGasLimit,
       numWords
@@ -112,8 +115,8 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
     numDraws++;
 
     uint256 indexOfWinner = randomWords[0] % walletsInRaffle.length;
-    requestIdPlacement[numDraws] = requestId;
-    randomNumberPlacement[numDraws] = randomWords[0];
+    vrfRequestIdPlacement[numDraws] = requestId;
+    vrfRandomNumberPlacement[numDraws] = randomWords[0];
     winners[numDraws] = walletsInRaffle[indexOfWinner];
 
     removeWalletFromRaffle(indexOfWinner);
