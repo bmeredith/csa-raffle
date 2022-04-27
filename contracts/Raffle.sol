@@ -38,10 +38,6 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
 
   uint64 subscriptionId;
 
-  // Rinkeby coordinator. For other networks,
-  // see https://docs.chain.link/docs/vrf-contracts/#configurations
-  address vrfCoordinator = 0x6168499c0cFfCaCD319c818142124B7A15E857ab;
-
   // The gas lane to use, which specifies the maximum gas price to bump to.
   // For a list of available gas lanes on each network,
   // see https://docs.chain.link/docs/vrf-contracts/#configurations
