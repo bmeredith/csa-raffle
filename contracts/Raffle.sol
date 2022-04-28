@@ -68,7 +68,7 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
     for(uint256 i=0;i < addresses.length;i++) {
       // ignore any addresses that are already part of the raffle
       if(isInRaffle[addresses[i]]) {
-        break;
+        continue;
       }
 
       walletsInRaffle.push(addresses[i]);
