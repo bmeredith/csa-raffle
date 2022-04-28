@@ -5,7 +5,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
+contract Raffle is VRFConsumerBaseV2, Ownable {
   VRFCoordinatorV2Interface COORDINATOR;
 
   // Keeps track of wallets that have been added the raffle. Once a wallet is selected 
@@ -43,8 +43,7 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
   // see https://docs.chain.link/docs/vrf-contracts/#configurations
   bytes32 vrfKeyHash;
 
-  // Depends on the number of requested values that you want sent to the
-  // fulfillRandomWords() function.
+  // The gas limit that will used when the fulfillRandomWords() function is called.
   uint32 callbackGasLimit = 350000;
 
   // The default is 3, but you can set this higher.
@@ -92,6 +91,14 @@ contract VRFv2Consumer is VRFConsumerBaseV2, Ownable {
 
   function drawWinner() external onlyOwner {
     requestRandomWords();
+  }
+
+  // In the event that VRF encounters an out of gas error during the callback to this contract,
+  // the gas limit can be adjusted here in order to fix that.
+  function updateVrfGasLimit(uint32 _callbackGasLimit) external onlyOwner {
+    require(raffleState == RAFFLE_STATE.CALCULATING_WINNER, "Invalid state");
+
+    callbackGasLimit = _callbackGasLimit;
   }
 
   function requestRandomWords() private { 
