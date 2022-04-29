@@ -62,6 +62,7 @@ contract Raffle is VRFConsumerBaseV2, Ownable {
   }
 
   function addWalletsToRaffle(address[] memory addresses) external onlyOwner {
+    require(numDraws == 0, "Cannot enter post draw");
     require(raffleState == RAFFLE_STATE.OPEN, "Raffle must be open");
 
     for(uint256 i=0;i < addresses.length;i++) {
