@@ -100,6 +100,7 @@ contract Raffle is VRFConsumerBaseV2, Ownable {
     require(raffleState == RAFFLE_STATE.CALCULATING_WINNER, "Invalid state");
 
     callbackGasLimit = _callbackGasLimit;
+    raffleState = RAFFLE_STATE.OPEN;
   }
 
   function requestRandomWords() private { 
